@@ -87,9 +87,9 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
 void writeLCD(char *string1, char *string2){
     lcdHome(lcd);
     lcdClear(lcd);
-    lcdPosition(int lcd, int 0, int 1);
+    lcdPosition(lcd, 0, 1);
     lcdPuts(lcd, string1);
-    lcdPosition(int lcd, int 0, int 2);
+    lcdPosition(lcd, 0, 2);
     lcdPuts(lcd, string2);
 }
 int main()
@@ -125,7 +125,7 @@ int main()
     if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS)
     {
         printf("Falha o conectar no MQTT, return code %d\n", rc);
-        lcdPuts(lcd, "Erro connect MQTT");
+        writeLCD("Erro:", "Conexão MQTT");
         exit(-1);
     }
 
