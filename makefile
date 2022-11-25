@@ -4,4 +4,4 @@ all: main
         as $(DEBUGFLGS) $(LSTFLGS) $< -o $@
 
 main: main.c
-        gcc -o main main.c -lpaho-mqtt3c -lwiringPi
+        gcc -o main main.c -lpaho-mqtt3c -lwiringPi -lwiringPiDev -lcrypt -lm -lrt -Wall

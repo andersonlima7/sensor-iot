@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <string.h>
 #include <wiringPi.h>
 #include <lcd.h>
 #include "MQTTClient.h"
+#include <stdlib.h>
 
 
 
@@ -54,7 +56,6 @@ void writeLCD(char *string1, char *string2);
 void publish(MQTTClient client, char* topic, char* payload) {
     MQTTClient_message message = MQTTClient_message_initializer;
     
-
     message.payload = payload;
     message.payloadlen = strlen(message.payload);
     message.qos = QOS;
@@ -90,9 +91,9 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
 void writeLCD(char *string1, char *string2) {
     lcdHome(lcd);
     lcdClear(lcd);
-    lcdPosition(lcd, 0, 1);
+    lcdPosition(lcd, 0, 0);
     lcdPuts(lcd, string1);
-    lcdPosition(lcd, 0, 2);
+    lcdPosition(lcd, 0, 1);
     lcdPuts(lcd, string2);
 }
 
