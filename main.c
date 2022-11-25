@@ -3,6 +3,12 @@
 #include <lcd.h>
 #include "MQTTClient.h"
 
+
+
+/*
+* Configuração MQTT
+*/
+
 #define ADDRESS "tcp://10.0.0.101:1883"
 #define CLIENTID "alunoSBC"
 #define USERNAME "TP02-G03"
@@ -14,9 +20,6 @@
 #define QOS 2
 #define TIMEOUT 10000L
 
-/*
-* Defines
-*/
 
 // Pinagem LCD
 #define RS 13
@@ -84,7 +87,7 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
  * @param string1 Mensagem da primeira linha.
  * @param string2 Mensagem da segunda linha.
 */
-void writeLCD(char *string1, char *string2){
+void writeLCD(char *string1, char *string2) {
     lcdHome(lcd);
     lcdClear(lcd);
     lcdPosition(lcd, 0, 1);
@@ -92,6 +95,7 @@ void writeLCD(char *string1, char *string2){
     lcdPosition(lcd, 0, 2);
     lcdPuts(lcd, string2);
 }
+
 int main()
 {
 
