@@ -287,14 +287,6 @@ void automaticMeasurements(void)
 }
 
 
-void changeMeasurements(void)
-{
-  
-}
- 
- 
-
-
 void code_uploaded(){
   for(int i=0;i<2;i++){
     digitalWrite(LED_BUILTIN,LOW);
