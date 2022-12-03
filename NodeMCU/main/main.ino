@@ -3,6 +3,7 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <PubSubClient.h> // Importa a Biblioteca PubSubClient
+#include "Timer.h"
 #include <string.h> 
 
 
@@ -23,6 +24,21 @@
 #define PASSWORD "@luno*123"
 #define QOS 2                                                   // A mensagem é sempre entregue exatamente uma vez.
 #define WILL_MESSAGE 0x1F                                       // Mensagem que é enviada caso o NodeMCU perca a conexão(0X1F = NodeMCU com problema).
+
+
+//Mapeamento de pinos do NodeMCU
+#define pin16    16
+#define pin5      5
+#define pin4      4
+#define pin0      0
+#define pin2      2
+#define pin14    14
+#define pin12    12
+#define pin13    13
+#define pin15    15
+#define pin3      3
+#define pin1      1
+ 
 
 
 // FIXME: Retirar o comentário. 
@@ -46,13 +62,14 @@ PubSubClient MQTT(espClient); // Instancia o Cliente MQTT passando o objeto espC
 
 int ledPin = LED_BUILTIN;     // Pino do LED.
 const int sensorAnalog = A0;  // Entrada analógica.
-int measurementTime = 10;     // valor padrão do tempo de medições: 10 segundos. 
+int measurementTime = 30;     // valor padrão do tempo de medições: 30 segundos.
+Timer t; 
 
 // Funções MQTT
-
 void onMessage(char* topic, byte* payload, unsigned int length);
 void publishData(char* topic, byte* message,  unsigned int length);
 void publishString(char* topic, char* message);
+void automaticMeasurements(void);
 
 
 /**
@@ -77,7 +94,7 @@ void reconnectMQTT()
         Serial.print("* Tentando se conectar ao Broker MQTT: ");
         Serial.println(BROKER);
         // boolean connect (clientID, [username, password], [willTopic, willQoS, willRetain, willMessage], [cleanSession])
-        // MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC, QOS, false, WILL_MESSAGE)
+        // MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE)
         if (MQTT.connect(CLIENTID))  
         {
             Serial.println("Conectado com sucesso ao broker MQTT!");
@@ -191,10 +208,10 @@ void onMessage(char* topic, byte* payload, unsigned int length)
                 byte response[1];
                 if(!ligado) // LED desligado
                 {
-                  response[0] = 0x07;   
+                  response[0] = {0x07};   
                 }
                 else {   // Led ligado
-                  response[0] = 0x08; 
+                  response[0] = {0x08}; 
                 }
                 publishData(PUBLISH_TOPIC_RESPONSE, response, 1);  
               }
@@ -202,7 +219,7 @@ void onMessage(char* topic, byte* payload, unsigned int length)
             default:
                 //Problema na requisicao ao NodeMCU.
                 byte response[1] = {0x1F};
-                publishData(PUBLISH_TOPIC_RESPONSE, response, 2);
+                publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
                 break;
           }
         }
@@ -213,6 +230,8 @@ void onMessage(char* topic, byte* payload, unsigned int length)
           Serial.println(measurementTime);
           byte response[1] = {0x09};
           publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
+          t.stop(0);
+          t.every(measurementTime * 1000, automaticMeasurements);
         }
     }
     else{
@@ -249,6 +268,30 @@ void publishString(char* topic, char* message)
     MQTT.publish(topic, message, true);  
     Serial.println("Mensagem enviada ao SBC!");
 }
+
+
+/**
+ * Realiza as medições automáticas dos sensores em um tempo definido.
+*/
+void automaticMeasurements(void)
+{
+  byte valorSensor1[1] = {digitalRead(pin16)};
+  byte valorSensor2[1] = {digitalRead(pin5)};
+  int analogValue= analogRead(sensorAnalog);
+  char valorSensor3[5];            
+  sprintf(valorSensor3, "%d", analogValue);
+ 
+  publishData(PUBLISH_TOPIC_SENSOR1, valorSensor1, 1);
+  publishData(PUBLISH_TOPIC_SENSOR2, valorSensor2, 1);
+  publishString(PUBLISH_TOPIC_SENSOR3, valorSensor3);
+}
+
+
+void changeMeasurements(void)
+{
+  
+}
+ 
  
 
 
@@ -341,12 +384,14 @@ void setup() {
   OTA_setup(); 
   pinMode(ledPin,OUTPUT);
   initMQTT();
-  digitalWrite(ledPin,HIGH);
-  Serial.begin(9600); //Inicia a uart com um baudrate de 9600.
+  t.every(measurementTime * 1000, automaticMeasurements);  // Define que a função de medições automáticas deve ser chamada a cada X segundos.
+  digitalWrite(ledPin, HIGH);
+  Serial.begin(9600); 
 }
 
 void loop() {
     ArduinoOTA.handle();
     checkMQTTConnection();
-    MQTT.loop();
+    MQTT.loop(); //This should be called regularly to allow the client to process incoming messages and maintain its connection to the server.
+    t.update();
 }
