@@ -3,6 +3,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <PubSubClient.h> // Importa a Biblioteca PubSubClient
+#include "Timer.h"
+#include <string.h> 
 
 
 #ifndef STASSID
@@ -11,11 +13,35 @@
 #endif
 
 // MQTT
-#define SUBSCRIBE_TOPIC "NodeMCU/comando"     //tópico MQTT de escuta
-#define PUBLISH_TOPIC   "NodeMCU/resposta"    //tópico MQTT de envio de informações para Broker
-#define CLIENTID "TP02-G03-ESP"
+#define SUBSCRIBE_TOPIC_COMMAND "TP02G03/SBC/node0/comando"     //tópico MQTT de escuta dos comandos vindos da SBC.
+#define SUBSCRIBE_TOPIC_TIME    "TP02G03/SBC/node0/tempo"       //tópico MQTT de escuta do tempo de medição dos sensores.
+#define PUBLISH_TOPIC_RESPONSE  "TP02G03/SBC/node0/resposta"    //tópico MQTT de envio de códigos de resposta para o SBC.
+#define PUBLISH_TOPIC_SENSOR1   "TP02G03/SBC/node0/sensor1"     //tópico MQTT de envio dos dados sensor 1 (DIGITAL)
+#define PUBLISH_TOPIC_SENSOR2   "TP02G03/SBC/node0/sensor2"     //tópico MQTT de envio dos dados sensor 2 (DIGITAL)
+#define PUBLISH_TOPIC_SENSOR3   "TP02G03/SBC/node0/sensor3"     //tópico MQTT de envio dos dados sensor 2 (ANALÓGICO)
+#define CLIENTID "TP02G03-ESP"
+#define USER "aluno"
+#define PASSWORD "@luno*123"
+#define QOS 2                                                   // A mensagem é sempre entregue exatamente uma vez.
+#define WILL_MESSAGE 0x1F                                       // Mensagem que é enviada caso o NodeMCU perca a conexão(0X1F = NodeMCU com problema).
 
 
+//Mapeamento de pinos do NodeMCU
+#define pin16    16
+#define pin5      5
+#define pin4      4
+#define pin0      0
+#define pin2      2
+#define pin14    14
+#define pin12    12
+#define pin13    13
+#define pin15    15
+#define pin3      3
+#define pin1      1
+ 
+
+
+// FIXME: Retirar o comentário. 
 // Definições de rede
 // IPAddress local_IP(10, 0, 0, 109);
 // IPAddress gateway(10, 0, 0, 1);
@@ -34,23 +60,16 @@ WiFiClient espClient; // Cria o objeto espClient
 PubSubClient MQTT(espClient); // Instancia o Cliente MQTT passando o objeto espClient
 
 
-int ledPin = LED_BUILTIN; // Pino do LED.
-const int sensorAnalog = A0; // Entrada analógica.
-
-//Variáveis que guardam o comando e o endereço do sensor na requisição.
-byte command;
-byte address;
-
-// Variáveis para guardar os valores dos sensores.
-int analogValue = 0; // Valor lido da entrada analógica.
-int digitalValue = 0; // Valor lido dos sensores digitais.
-
-
+int ledPin = LED_BUILTIN;     // Pino do LED.
+const int sensorAnalog = A0;  // Entrada analógica.
+int measurementTime = 30;     // valor padrão do tempo de medições: 30 segundos.
+Timer t; 
 
 // Funções MQTT
-
 void onMessage(char* topic, byte* payload, unsigned int length);
-void handleRequest(int command, int address);
+void publishData(char* topic, byte* message,  unsigned int length);
+void publishString(char* topic, char* message);
+void automaticMeasurements(void);
 
 
 /**
@@ -74,10 +93,13 @@ void reconnectMQTT()
     {
         Serial.print("* Tentando se conectar ao Broker MQTT: ");
         Serial.println(BROKER);
-        if (MQTT.connect(CLIENTID)) 
+        // boolean connect (clientID, [username, password], [willTopic, willQoS, willRetain, willMessage], [cleanSession])
+        // MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE)
+        if (MQTT.connect(CLIENTID))  
         {
             Serial.println("Conectado com sucesso ao broker MQTT!");
-            MQTT.subscribe(SUBSCRIBE_TOPIC); 
+            MQTT.subscribe(SUBSCRIBE_TOPIC_COMMAND, 1); 
+            MQTT.subscribe(SUBSCRIBE_TOPIC_TIME, 1); 
         } 
         else
         {
@@ -89,7 +111,9 @@ void reconnectMQTT()
 }
 
 
-
+/**
+ * Caso a NodeMCU não esteja conectado ao WiFi, a conexão é restabelecida.
+*/
 void reconnectWiFi() 
 {
     //se já está conectado a rede WI-FI, nada é feito. 
@@ -115,14 +139,14 @@ void reconnectWiFi()
 
 
 /**
- * Verifica se o cliente está conectado ao broker MQTT.
+ * Verifica se o cliente está conectado ao broker MQTT e ao WiFi.
  * Em caso de desconexão, a conexão é restabelecida.
 */
 void checkMQTTConnection(void)
 {
+    reconnectWiFi();
     if (!MQTT.connected()) 
         reconnectMQTT(); //se não há conexão com o Broker, a conexão é refeita
-    reconnectWiFi();
 }
 
 
@@ -135,49 +159,131 @@ void checkMQTTConnection(void)
 */
 void onMessage(char* topic, byte* payload, unsigned int length) 
 {
-    String msg;
- 
-    //obtem a string do payload recebido
-    for(int i = 0; i < length; i++) 
-    {
-       char c = (char)payload[i];
-       msg += c;
-    }
+    Serial.println("Mensagem recebida no tópico :");
+    Serial.println(topic);
+    if(length > 0) { // Verifica se há algo no payload da mensagem recebida.
 
-    Serial.println(msg);
-   
-    //toma ação dependendo da string recebida:
-    //verifica se deve colocar nivel alto de tensão na saída D0:
-    //IMPORTANTE: o Led já contido na placa é acionado com lógica invertida (ou seja,
-    //enviar HIGH para o output faz o Led apagar / enviar LOW faz o Led acender)
-    if (msg.equals("L"))
-    {
-        digitalWrite(ledPin, LOW);
-        digitalValue = 1;
+        if(strcmp(topic, SUBSCRIBE_TOPIC_COMMAND) == 0) 
+        {
+          Serial.println("Mensagem de comando recebida.");
+          Serial.println(payload[0]);
+          switch(payload[0]) 
+          {
+            case 0x03: 
+            {
+             // Situação do NodeMCU
+              byte response[1] = {0x00};
+              publishData(PUBLISH_TOPIC_RESPONSE, response, 1);                     // NodeMCU funcionando OK.
+              break;
+            }
+            case 0x04: 
+            {
+              // Valor da entrada analógica.
+              int value = analogRead(sensorAnalog);  // Ler o valor atual da entrada analógica. 
+              char analogValue[5];            
+              sprintf(analogValue, "%d", value);          
+              Serial.println(analogValue);
+              byte response[1] = {0x01};
+              publishString(PUBLISH_TOPIC_SENSOR3, analogValue);    
+              publishData(PUBLISH_TOPIC_RESPONSE, response, 1);    
+            }
+              break;
+            case 0x05: // Valor da entrada digital.
+            {
+              int pino = payload[1];                        // Pino que o sensor está pinado.
+              pinMode(pino, INPUT);                        // Define o pino como entrada.                     // Ler o valor do sensor neste pino.
+              byte digitalValue[1] = {digitalRead(pino)};
+              if(pino == 16)
+                  publishData(PUBLISH_TOPIC_SENSOR1, digitalValue, 1);
+              else if(pino == 5)
+                  publishData(PUBLISH_TOPIC_SENSOR2, digitalValue, 1);
+              byte response[1] = {0x02};
+              publishData(PUBLISH_TOPIC_RESPONSE, response, 1);   
+            }
+              break;
+            case 0x06: //Controla o LED, ligando se estiver desligado ou desligando se estiver ligado.
+              {
+                int ligado = digitalRead(ledPin);
+                digitalWrite(ledPin, !ligado);
+                byte response[1];
+                if(!ligado) // LED desligado
+                {
+                  response[0] = {0x07};   
+                }
+                else {   // Led ligado
+                  response[0] = {0x08}; 
+                }
+                publishData(PUBLISH_TOPIC_RESPONSE, response, 1);  
+              }
+              break;
+            default:
+                //Problema na requisicao ao NodeMCU.
+                byte response[1] = {0x1F};
+                publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
+                break;
+          }
+        }
+        else if(strcmp(topic, SUBSCRIBE_TOPIC_TIME) == 0) {
+          Serial.println("Alteracao do tempo recebida.");
+          int newTime = payload[0];
+          measurementTime = newTime;
+          Serial.println(measurementTime);
+          byte response[1] = {0x09};
+          publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
+          t.stop(0);
+          t.every(measurementTime * 1000, automaticMeasurements);
+        }
     }
- 
-    //verifica se deve colocar nivel alto de tensão na saída D0:
-    if (msg.equals("D"))
-    {
-        digitalWrite(ledPin, HIGH);
-        digitalValue = 0;
+    else{
+      Serial.println("Mensagem vazia!");
     }
-     
 }
+
 
 /**
  * Envia dados para o SBC via o tópico de publicação.
+ * @param topic Tópico que será publicado a mensagem.
+ * @param message Mensagem a ser enviada.
+ * @param length Quantidade de bytes a ser enviado.
 */
-void sendData(void)
+void publishData(char* topic, byte* message,  unsigned int length) 
 {
-    if (digitalValue == 0)
-      MQTT.publish(PUBLISH_TOPIC, "Desligado");
+    // boolean publish (topic, payload, [length], [retained])
+    // Envia a mensagem ao broker para ser enviada aos subscribers(SBC) e indica que essa mensagem deve ser armazenada no broker.
+    // Desse modo, permite que os subscribers possam ter a informação mais atualizada sem ter que esperar o publisher enviar a nova informação.
+    MQTT.publish(topic, message, length, true);  
+    Serial.println("Mensagem enviada ao SBC!");
+}
+
+/**
+ * Envia dados ce string para o SBC via o tópico de publicação.
+ * @param topic Tópico que será publicado a mensagem.
+ * @param message Mensagem a ser enviada.
+*/
+void publishString(char* topic, char* message) 
+{
+    // boolean publish (topic, payload, [length], [retained])
+    // Envia a mensagem ao broker para ser enviada aos subscribers(SBC) e indica que essa mensagem deve ser armazenada no broker.
+    // Desse modo, permite que os subscribers possam ter a informação mais atualizada sem ter que esperar o publisher enviar a nova informação.
+    MQTT.publish(topic, message, true);  
+    Serial.println("Mensagem enviada ao SBC!");
+}
+
+
+/**
+ * Realiza as medições automáticas dos sensores em um tempo definido.
+*/
+void automaticMeasurements(void)
+{
+  byte valorSensor1[1] = {digitalRead(pin16)};
+  byte valorSensor2[1] = {digitalRead(pin5)};
+  int analogValue= analogRead(sensorAnalog);
+  char valorSensor3[5];            
+  sprintf(valorSensor3, "%d", analogValue);
  
-    if (digitalValue == 1)
-      MQTT.publish(PUBLISH_TOPIC, "Ligado");
- 
-    Serial.println("- Estado da saida D0 enviado ao broker!");
-    delay(1000);
+  publishData(PUBLISH_TOPIC_SENSOR1, valorSensor1, 1);
+  publishData(PUBLISH_TOPIC_SENSOR2, valorSensor2, 1);
+  publishString(PUBLISH_TOPIC_SENSOR3, valorSensor3);
 }
 
 
@@ -269,16 +375,15 @@ void setup() {
   code_uploaded();
   OTA_setup(); 
   pinMode(ledPin,OUTPUT);
-  command = -1; // Comando requisitado
-  address = -1; // Endereço requisitado
   initMQTT();
-  digitalWrite(ledPin,HIGH);
-  Serial.begin(9600); //Inicia a uart com um baudrate de 9600.
+  t.every(measurementTime * 1000, automaticMeasurements);  // Define que a função de medições automáticas deve ser chamada a cada X segundos.
+  digitalWrite(ledPin, HIGH);
+  Serial.begin(9600); 
 }
 
 void loop() {
     ArduinoOTA.handle();
     checkMQTTConnection();
-    sendData();
-    MQTT.loop();
+    MQTT.loop(); //This should be called regularly to allow the client to process incoming messages and maintain its connection to the server.
+    t.update();
 }
