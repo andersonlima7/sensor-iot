@@ -1,7 +1,7 @@
 all: main
 
 %.o : %.s
-        as $(DEBUGFLGS) $(LSTFLGS) $< -o $@
+	as $(DEBUGFLGS) $(LSTFLGS) $< -o $@
 
 main: main.c
-        gcc -o main main.c -lpaho-mqtt3c -lwiringPi -lwiringPiDev -lcrypt -lm -lrt -Wall
+	gcc -o main main.c -lpaho-mqtt3c -lwiringPi -lwiringPiDev -lcrypt -lm -lrt -Wall
