@@ -28,9 +28,9 @@ int sensor = 0;                     // Armazena a opcao do sensor selecionado pe
 /**
  * Valores atuais dos sensores
  */
-int historico_sensores1[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int historico_sensores2[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int historico_sensores3[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int historico_sensor1[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int historico_sensor2[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int historico_sensor3[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int node0_sensor1 = 0;
 int node0_sensor2 = 0;
 int node0_sensor3 = 0;
@@ -80,10 +80,10 @@ const int led_off = 0x08;
 int lcd;
 MQTTClient client;
 
-void slice(const char *str, char *result, size_t start, size_t end)
+/*void slice(const char *str, char *result, size_t start, size_t end)
 {
     strncpy(result, str + start, end - start);
-}
+}*/
 
 /*
  * Prototipos de funcao
@@ -102,13 +102,13 @@ void publish(MQTTClient client, char *topic, char *payload)
 {
     MQTTClient_message message = MQTTClient_message_initializer;
     message.payload = payload;
-    if (strcmp(topic, SBC_DEFINIR_TEMPO) == 0)
+    /*if (strcmp(topic, SBC_DEFINIR_TEMPO) == 0)
     {
-        sprintf(message.payload, "%i", *payload);
-    }
+        sprintf(message.payload, "%x", *payload);
+    }*/
     message.payloadlen = strlen(message.payload);
     message.qos = QOS;
-    message.retained = 1;
+    message.retained = 0;
 
     MQTTClient_deliveryToken token;
     MQTTClient_publishMessage(client, topic, &message, &token);
@@ -133,19 +133,28 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
     if (strcmp(topicName, NODE0_SENSOR1) == 0)
     {
         node0_sensor1 = *payload;
+        atualizar_valor_sensor(historico_sensor1, node0_sensor1);
+        enviar_valores_sensores_aplicacao();
+        atualizar_historico();
         printf("Valor sensor 1: %i", node0_sensor1);
     }
     if (strcmp(topicName, NODE0_SENSOR2) == 0)
     {
         node0_sensor2 = *payload;
+        atualizar_valor_sensor(historico_sensor2, node0_sensor2);
+        enviar_valores_sensores_aplicacao();
+        atualizar_historico();
         printf("Valor sensor 2: %i", node0_sensor2);
     }
     if (strcmp(topicName, NODE0_SENSOR3) == 0)
     {
         node0_sensor3 = *payload;
+        atualizar_valor_sensor(historico_sensor3, node0_sensor3);
+        enviar_valores_sensores_aplicacao();
+        atualizar_historico();
         printf("Valor sensor 3: %i", node0_sensor3);
     }
-    printf("%i", *payload);
+
     if (strcmp(topicName, NODE0_RESPOSTA) == 0)
     {
         // print("Resposta: %i")
@@ -167,7 +176,6 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
         }
     }
 
-    enviar_valores_sensores_aplicacao();
     /* Mostra a mensagem recebida */
     // printf("Mensagem recebida! \n\rTopico: %s Mensagem: %s\n", topicName, payload);
 
@@ -197,33 +205,64 @@ void writeLCD(char *string1, char *string2)
 void atualizar_valor_sensor(int *historico_sensor, int valor)
 {
     int aux;
-    for (int i = 9; i < 0; i--)
+    printf("recebi valor: %i", valor);
+    for (int i = 9; i > 0; i--)
     {
+        int aux_interno = 0;
         if (i == 9)
         {
+            printf("peguei o primeiro valor");
             aux = historico_sensor[i];
             historico_sensor[i] = valor;
         }
         else
+        {
+            aux_interno = historico_sensor[i];
             historico_sensor[i] = aux;
-        aux = historico_sensor[i];
+            aux = aux_interno;
+        }
     }
+    printf("\n Histórico Sensor:");
+    for (int i = 0; i < 10; i++)
+    {
+        printf("Medição %i - valor: %i \n", i, historico_sensor[i]);
+    }
+    printf("Finalizar");
 }
 
 void atualizar_historico()
 {
-    arquivo_historico = fopen("/arquivo_historico.txt", "w");
-    if (arquivo_historico == NULL)
+    char msg[300];
+    char sensor1[100];
+    char sensor2[100];
+    char sensor3[100];
+    sprintf(sensor1, "sensor1: {");
+    for (int i = 0; i <= 9; i++)
     {
-        printf("Erro na leitura do arquivo");
+        char valor[10];
+        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor1[i]);
+        strcat(sensor1, valor);
     }
-    else
+    sprintf(sensor2, "} sensor2: {");
+    for (int i = 0; i <= 9; i++)
     {
-        char msg_json1[256];
-        sprintf(msg_json1, "sensor1: {}");
-        char msg_json2[256];
-        char msg_json3[256];
+        char valor[10];
+        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor2[i]);
+        strcat(sensor2, valor);
     }
+    sprintf(sensor3, "} sensor3: {");
+    for (int i = 0; i <= 9; i++)
+    {
+        char valor[10];
+        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor3[i]);
+        strcat(sensor3, valor);
+    }
+    strcat(msg, sensor1);
+    strcat(msg, sensor2);
+    strcat(msg, sensor3);
+    strcat(msg, "}");
+    printf("\n\n %s \n", msg);
+    publish(client, SBC_ENVIAR_HISTORICO, msg);
 }
 
 int main()
