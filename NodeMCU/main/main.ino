@@ -8,22 +8,21 @@
 
 
 #ifndef STASSID
-#define STASSID "Cesar" //INTELBRAS
-#define STAPSK  "25588122" //Pbl-Sistemas-Digitais
+#define STASSID "INTELBRAS" //"Cesar"
+#define STAPSK  "25588123" //"25588122"
+// #define STASSID "INTELBRAS" //"Cesar"
+// #define STAPSK  "Pbl-Sistemas-Digitais" //"25588122"
 #endif
 
 // MQTT
 #define SUBSCRIBE_TOPIC_COMMAND "TP02G03/SBC/node0/comando"     //tópico MQTT de escuta dos comandos vindos da SBC.
-#define SUBSCRIBE_TOPIC_TIME    "TP02G03/SBC/node0/tempo"       //tópico MQTT de escuta do tempo de medição dos sensores.
 #define PUBLISH_TOPIC_RESPONSE  "TP02G03/SBC/node0/resposta"    //tópico MQTT de envio de códigos de resposta para o SBC.
-#define PUBLISH_TOPIC_SENSOR1   "TP02G03/SBC/node0/sensor1"     //tópico MQTT de envio dos dados sensor 1 (DIGITAL)
-#define PUBLISH_TOPIC_SENSOR2   "TP02G03/SBC/node0/sensor2"     //tópico MQTT de envio dos dados sensor 2 (DIGITAL)
-#define PUBLISH_TOPIC_SENSOR3   "TP02G03/SBC/node0/sensor3"     //tópico MQTT de envio dos dados sensor 2 (ANALÓGICO)
+#define PUBLISH_TOPIC_SENSORES   "TP02G03/SBC/node0/sensores"     //tópico MQTT de envio dos dados dos sensores.
 #define CLIENTID "TP02G03-ESP"
 #define USER "aluno"
 #define PASSWORD "@luno*123"
 #define QOS 2                                                   // A mensagem é sempre entregue exatamente uma vez.
-#define WILL_MESSAGE 0x1F                                       // Mensagem que é enviada caso o NodeMCU perca a conexão(0X1F = NodeMCU com problema).
+                                 
 
 
 //Mapeamento de pinos do NodeMCU
@@ -38,6 +37,7 @@
 #define pin15    15
 #define pin3      3
 #define pin1      1
+#define pinAnalog A0  // Entrada analógica.
  
 
 
@@ -54,16 +54,20 @@ const char* password = STAPSK;
 
 // Configuração MQTT
 const char* BROKER = "broker.emqx.io"; // FIXME: Trocar pelo broker do lab.
+// const char* BROKER = "10.0.0.101";
 const int BROKER_PORT = 1883;
 
 WiFiClient espClient; // Cria o objeto espClient
 PubSubClient MQTT(espClient); // Instancia o Cliente MQTT passando o objeto espClient
 
+// Mensagem que é enviada caso o NodeMCU perca a conexão(0X1F = NodeMCU com problema).
+char WILL_MESSAGE[] = {0x1F};
 
 int ledPin = LED_BUILTIN;     // Pino do LED.
-const int sensorAnalog = A0;  // Entrada analógica.
+
+
 int measurementTime = 30;     // valor padrão do tempo de medições: 30 segundos.
-Timer t; 
+Timer t;                      // Para utilizar a biblioteca de tempo.
 
 // Funções MQTT
 void onMessage(char* topic, byte* payload, unsigned int length);
@@ -95,11 +99,10 @@ void reconnectMQTT()
         Serial.println(BROKER);
         // boolean connect (clientID, [username, password], [willTopic, willQoS, willRetain, willMessage], [cleanSession])
         // MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE)
-        if (MQTT.connect(CLIENTID))  
+        if (MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE))
         {
             Serial.println("Conectado com sucesso ao broker MQTT!");
             MQTT.subscribe(SUBSCRIBE_TOPIC_COMMAND, 1); 
-            MQTT.subscribe(SUBSCRIBE_TOPIC_TIME, 1); 
         } 
         else
         {
@@ -179,26 +182,21 @@ void onMessage(char* topic, byte* payload, unsigned int length)
             case 0x04: 
             {
               // Valor da entrada analógica.
-              int value = analogRead(sensorAnalog);  // Ler o valor atual da entrada analógica. 
-              char analogValue[5];            
-              sprintf(analogValue, "%d", value);          
-              Serial.println(analogValue);
-              byte response[1] = {0x01};
-              publishString(PUBLISH_TOPIC_SENSOR3, analogValue);    
-              publishData(PUBLISH_TOPIC_RESPONSE, response, 1);    
+              int value = analogRead(pinAnalog);  // Ler o valor atual da entrada analógica. 
+              byte firstByte = value / 256; // Pega o primeiro byte do valor.
+              byte secondByte = value % 256; // Pega o segundo byte do valor.         
+              Serial.println(value);
+              byte response[] = {0x01, firstByte, secondByte};    
+              publishData(PUBLISH_TOPIC_RESPONSE, response, sizeof(response));    
             }
               break;
             case 0x05: // Valor da entrada digital.
             {
-              int pino = payload[1];                        // Pino que o sensor está pinado.
-              pinMode(pino, INPUT);                        // Define o pino como entrada.                     // Ler o valor do sensor neste pino.
-              byte digitalValue[1] = {digitalRead(pino)};
-              if(pino == 16)
-                  publishData(PUBLISH_TOPIC_SENSOR1, digitalValue, 1);
-              else if(pino == 5)
-                  publishData(PUBLISH_TOPIC_SENSOR2, digitalValue, 1);
-              byte response[1] = {0x02};
-              publishData(PUBLISH_TOPIC_RESPONSE, response, 1);   
+              int pino = payload[1];                          // Pino que o sensor está pinado.
+              pinMode(pino, INPUT);                           // Define o pino como entrada.                     
+              int value = digitalRead(pino);                // Ler o valor do sensor neste pino.
+              byte response[] = {0x02, value};
+              publishData(PUBLISH_TOPIC_RESPONSE, response, sizeof(response));   
             }
               break;
             case 0x06: //Controla o LED, ligando se estiver desligado ou desligando se estiver ligado.
@@ -214,6 +212,19 @@ void onMessage(char* topic, byte* payload, unsigned int length)
                   response[0] = {0x08}; 
                 }
                 publishData(PUBLISH_TOPIC_RESPONSE, response, 1);  
+                break;
+              }
+            case 0x09: // Altera o tempo de medições dos sensores.
+              {
+                Serial.println("Alteracao do tempo recebida.");
+                int newTime = payload[1];
+                measurementTime = newTime;
+                Serial.print("Novo tempo: ");
+                Serial.println(measurementTime);
+                byte response[1] = {0x0A};
+                publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
+                t.stop(0);
+                t.every(measurementTime * 1000, automaticMeasurements);
               }
               break;
             default:
@@ -222,16 +233,6 @@ void onMessage(char* topic, byte* payload, unsigned int length)
                 publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
                 break;
           }
-        }
-        else if(strcmp(topic, SUBSCRIBE_TOPIC_TIME) == 0) {
-          Serial.println("Alteracao do tempo recebida.");
-          int newTime = payload[0];
-          measurementTime = newTime;
-          Serial.println(measurementTime);
-          byte response[1] = {0x09};
-          publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
-          t.stop(0);
-          t.every(measurementTime * 1000, automaticMeasurements);
         }
     }
     else{
@@ -275,15 +276,15 @@ void publishString(char* topic, char* message)
 */
 void automaticMeasurements(void)
 {
-  byte valorSensor1[1] = {digitalRead(pin16)};
-  byte valorSensor2[1] = {digitalRead(pin5)};
-  int analogValue= analogRead(sensorAnalog);
-  char valorSensor3[5];            
-  sprintf(valorSensor3, "%d", analogValue);
- 
-  publishData(PUBLISH_TOPIC_SENSOR1, valorSensor1, 1);
-  publishData(PUBLISH_TOPIC_SENSOR2, valorSensor2, 1);
-  publishString(PUBLISH_TOPIC_SENSOR3, valorSensor3);
+  byte sensor1 = {digitalRead(pin16)};
+  byte sensor2 = {digitalRead(pin5)};
+  int analogValue= analogRead(pinAnalog);
+  byte firstByteSensor3 = analogValue / 256; // Pega o primeiro byte do valor.
+  byte secondByteSensor3 = analogValue % 256; // Pega o segundo byte do valor.
+
+  byte values[] = {sensor1, sensor2, firstByteSensor3, secondByteSensor3};
+  
+  publishData(PUBLISH_TOPIC_SENSORES, values, sizeof(values));
 }
 
 
