@@ -82,10 +82,10 @@ const int tempo_alterado = 0x0A;
 int lcd;
 MQTTClient client;
 
-void slice(const char *str, char *result, size_t start, size_t end)
+/*void slice(const char *str, char *result, size_t start, size_t end)
 {
     strncpy(result, str + start, end - start);
-}
+}*/
 
 /*
  * Prototipos de funcao
@@ -188,12 +188,6 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
         atualizar_historico_sensor(historico_sensores3, 3, sensor3);
     }
 
-    // enviar_valores_sensores_aplicacao();
-    /* Mostra a mensagem recebida */
-    // printf("Mensagem recebida! \n\rTopico: %s Mensagem: %s\n", topicName, payload);
-
-    // publish(client, SUBSCRIBE_TOPIC, cat);
-
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
     return 1;
@@ -245,18 +239,37 @@ void atualizar_historico_sensor(int *historico_sensor, int sensor, int valor)
 
 void atualizar_historico()
 {
-    arquivo_historico = fopen("/arquivo_historico.txt", "w");
-    if (arquivo_historico == NULL)
+    char msg[300];
+    char sensor1[100];
+    char sensor2[100];
+    char sensor3[100];
+    sprintf(sensor1, "sensor1: {");
+    for (int i = 0; i <= 9; i++)
     {
-        printf("Erro na leitura do arquivo");
+        char valor[10];
+        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor1[i]);
+        strcat(sensor1, valor);
     }
-    else
+    sprintf(sensor2, "} sensor2: {");
+    for (int i = 0; i <= 9; i++)
     {
-        char msg_json1[256];
-        sprintf(msg_json1, "sensor1: {}");
-        char msg_json2[256];
-        char msg_json3[256];
+        char valor[10];
+        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor2[i]);
+        strcat(sensor2, valor);
     }
+    sprintf(sensor3, "} sensor3: {");
+    for (int i = 0; i <= 9; i++)
+    {
+        char valor[10];
+        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor3[i]);
+        strcat(sensor3, valor);
+    }
+    strcat(msg, sensor1);
+    strcat(msg, sensor2);
+    strcat(msg, sensor3);
+    strcat(msg, "}");
+    printf("\n\n %s \n", msg);
+    publish(client, SBC_ENVIAR_HISTORICO, msg);
 }
 
 /**
