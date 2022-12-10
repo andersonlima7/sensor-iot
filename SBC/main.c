@@ -30,9 +30,9 @@ int sensor = 0;                     // Armazena a opcao do sensor selecionado pe
 /**
  * Valores atuais dos sensores
  */
-int historico_sensores1[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int historico_sensores2[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int historico_sensores3[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int historico_sensor1[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int historico_sensor2[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int historico_sensor3[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int sensor1 = 0;
 int sensor2 = 0;
 int sensor3 = 0;
@@ -144,18 +144,18 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
             unsigned char lowByte = payload[2];
             sensor3 = (highByte * 256) + lowByte; //Converte os dois bytes em um único valor.
             sprintf(msg, "%d", sensor3);
-            atualizar_historico_sensor(historico_sensores3, 3, sensor3);
+            atualizar_historico_sensor(historico_sensor3, 3, sensor3);
             writeLCD("SENSOR ANALOGICO", msg);
         }
         else if(payload[0] == resposta_digital) {
             char msg[16];
             if(sensor == 16){
                 sensor1 = payload[1];
-                atualizar_historico_sensor(historico_sensores1, 1, sensor1);
+                atualizar_historico_sensor(historico_sensor1, 1, sensor1);
             }
             else if(sensor == 5){
                 sensor2 = payload[1];
-                atualizar_historico_sensor(historico_sensores2, 2, sensor2);
+                atualizar_historico_sensor(historico_sensor2, 2, sensor2);
             }
             sprintf(msg, "Sensor%d:%d", sensor, sensor1);
             writeLCD(msg, " ");
@@ -183,9 +183,9 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
         sprintf(msg1, "s1:%d   s2:%d", sensor1, sensor2);;
         sprintf(msg2, "s3:%d", sensor3);;
         writeLCD(msg1, msg2);
-        atualizar_historico_sensor(historico_sensores1, 1, sensor1);
-        atualizar_historico_sensor(historico_sensores2, 2, sensor2);
-        atualizar_historico_sensor(historico_sensores3, 3, sensor3);
+        atualizar_historico_sensor(historico_sensor1, 1, sensor1);
+        atualizar_historico_sensor(historico_sensor2, 2, sensor2);
+        atualizar_historico_sensor(historico_sensor3, 3, sensor3);
     }
 
     MQTTClient_freeMessage(&message);
@@ -271,6 +271,7 @@ void atualizar_historico()
     printf("\n\n %s \n", msg);
     publish(client, SBC_ENVIAR_HISTORICO, msg);
 }
+
 
 /**
  * Reconecta-se ao broker MQTT (caso ainda não esteja conectado ou em caso de a conexão cair)
