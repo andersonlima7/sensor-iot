@@ -1,0 +1,20 @@
+/sensor-iot-app/node_modules
+/sensor-iot-app/.pnp
+/sensor-iot-app/.pnp.js
+
+# testing
+/sensor-iot-app/coverage
+
+# production
+/sensor-iot-app/build
+
+# misc
+/sensor-iot-app.DS_Store
+/sensor-iot-app.env.local
+/sensor-iot-app.env.development.local
+/sensor-iot-app.env.test.local
+/sensor-iot-app.env.production.local
+
+/sensor-iot-app/npm-debug.log*
+/sensor-iot-app/yarn-debug.log*
+/sensor-iot-app/yarn-error.log*
