@@ -1,20 +1,24 @@
 #include <stdio.h>
 #include <string.h>
-//#include <wiringPi.h>
-//#include <lcd.h>
+// #include <wiringPi.h>
+// #include <lcd.h>
 #include <MQTTClient.h>
 #include <stdlib.h>
 #include <string.h>
-#include<unistd.h>
+#include <unistd.h>
 
 /*
  * Configuração MQTT
  */
-#define ADDRESS "mqtt://broker.emqx.io:1883"
-#define CLIENTID "alunoSBC"
+// #define ADDRESS "mqtt://10.0.0.101:1883"
+// #define CLIENTID "alunoSBC"
 #define USERNAME ""
 #define PASSWORD ""
-#define QOS 2
+#define ADDRESS "mqtt://broker.mqttdashboard.com:1883"
+#define CLIENTID "alunoSBC123"
+// #define USERNAME "aluno"
+// #define PASSWORD "@luno*123"
+#define QOS 0
 #define TIMEOUT 10000L
 
 /*
@@ -132,47 +136,57 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
     {
         // print("Resposta: %i")
 
-        if(*payload == node_ok) {
+        if (*payload == node_ok)
+        {
             writeLCD("NodeMCU: OK", " ");
         }
-        else if(*payload == node_erro) {
-             writeLCD("NodeMCU: ERRO", " ");
+        else if (*payload == node_erro)
+        {
+            writeLCD("NodeMCU: ERRO", " ");
         }
-        else if(payload[0] == resposta_analogico) {
+        else if (payload[0] == resposta_analogico)
+        {
             char msg[16];
             unsigned char highByte = payload[1];
             unsigned char lowByte = payload[2];
-            sensor3 = (highByte * 256) + lowByte; //Converte os dois bytes em um único valor.
+            sensor3 = (highByte * 256) + lowByte; // Converte os dois bytes em um único valor.
             sprintf(msg, "%d", sensor3);
             atualizar_historico_sensor(historico_sensor3, 3, sensor3);
             writeLCD("SENSOR ANALOGICO", msg);
         }
-        else if(payload[0] == resposta_digital) {
+        else if (payload[0] == resposta_digital)
+        {
             char msg[16];
-            if(sensor == 16){
+            if (sensor == 16)
+            {
                 sensor1 = payload[1];
                 atualizar_historico_sensor(historico_sensor1, 1, sensor1);
             }
-            else if(sensor == 5){
+            else if (sensor == 5)
+            {
                 sensor2 = payload[1];
                 atualizar_historico_sensor(historico_sensor2, 2, sensor2);
             }
             sprintf(msg, "Sensor%d:%d", sensor, sensor1);
             writeLCD(msg, " ");
         }
-        else if(*payload == led_on) {
+        else if (*payload == led_on)
+        {
             writeLCD("LED: ON", " ");
         }
-        else if(*payload == led_off) {
+        else if (*payload == led_off)
+        {
             writeLCD("LED: OFF", " ");
-        }   
-        else if(*payload == tempo_alterado) {
+        }
+        else if (*payload == tempo_alterado)
+        {
             char msg[16];
             sprintf(msg, "%d segundos", tempo);
             writeLCD("NOVO TEMPO:", msg);
         }
     }
-    else if(strcmp(topicName, SENSORES) == 0) {
+    else if (strcmp(topicName, SENSORES) == 0)
+    {
         sensor1 = payload[0];
         sensor2 = payload[1];
         unsigned char highByte = payload[2];
@@ -180,8 +194,10 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
         sensor3 = (highByte * 256) + lowByte;
         char msg1[16];
         char msg2[16];
-        sprintf(msg1, "s1:%d   s2:%d", sensor1, sensor2);;
-        sprintf(msg2, "s3:%d", sensor3);;
+        sprintf(msg1, "s1:%d   s2:%d", sensor1, sensor2);
+        ;
+        sprintf(msg2, "s3:%d", sensor3);
+        ;
         writeLCD(msg1, msg2);
         atualizar_historico_sensor(historico_sensor1, 1, sensor1);
         atualizar_historico_sensor(historico_sensor2, 2, sensor2);
@@ -197,7 +213,7 @@ int on_message(void *context, char *topicName, int topicLen, MQTTClient_message 
  * Escreve no display LCD.
  * @param string1 Mensagem da primeira linha.
  * @param string2 Mensagem da segunda linha.
-**/
+ **/
 void writeLCD(char *string1, char *string2)
 {
     // lcdHome(lcd);
@@ -206,10 +222,9 @@ void writeLCD(char *string1, char *string2)
     // lcdPuts(lcd, string1);
     // lcdPosition(lcd, 0, 1);
     // lcdPuts(lcd, string2);
-    printf("\n%s\n",string1);
-    printf("\n%s\n",string2);
+    printf("\n%s\n", string1);
+    printf("\n%s\n", string2);
 }
-
 
 void atualizar_historico_sensor(int *historico_sensor, int sensor, int valor)
 {
@@ -219,7 +234,7 @@ void atualizar_historico_sensor(int *historico_sensor, int sensor, int valor)
         int aux_interno = 0;
         if (i == 9)
         {
-            
+
             aux = historico_sensor[i];
             historico_sensor[i] = valor;
         }
@@ -233,60 +248,73 @@ void atualizar_historico_sensor(int *historico_sensor, int sensor, int valor)
     printf("\n Histórico Sensor %d: \n", sensor);
     for (int i = 9; i >= 0; i--)
     {
-        printf("Medição %i - valor: %i \n", abs(9-i), historico_sensor[i]);
+        printf("Medição %i - valor: %i \n", abs(9 - i), historico_sensor[i]);
     }
 }
 
 void atualizar_historico()
 {
-    char msg[300];
+    char msg[300] = {"\0"};
     char sensor1[100];
     char sensor2[100];
     char sensor3[100];
-    sprintf(sensor1, "sensor1: {");
+    sprintf(sensor1, "{\"sensor1\": {");
     for (int i = 0; i <= 9; i++)
     {
         char valor[10];
-        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor1[i]);
+        if (i == 9)
+            sprintf(valor, "\"%i\": %i ", (i + 1), historico_sensor1[i]);
+        else
+            sprintf(valor, "\"%i\": %i, ", (i + 1), historico_sensor1[i]);
         strcat(sensor1, valor);
     }
-    sprintf(sensor2, "} sensor2: {");
+    sprintf(sensor2, "}, \"sensor2\": {");
     for (int i = 0; i <= 9; i++)
     {
         char valor[10];
-        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor2[i]);
+        if (i == 9)
+            sprintf(valor, "\"%i\": %i ", (i + 1), historico_sensor2[i]);
+        else
+            sprintf(valor, "\"%i\": %i, ", (i + 1), historico_sensor2[i]);
         strcat(sensor2, valor);
     }
-    sprintf(sensor3, "} sensor3: {");
+    sprintf(sensor3, "}, \"sensor3\": {");
     for (int i = 0; i <= 9; i++)
     {
         char valor[10];
-        sprintf(valor, "%i: %i, ", (i + 1), historico_sensor3[i]);
+
+        if (i == 9)
+            sprintf(valor, "\"%i\": %i ", (i + 1), historico_sensor3[i]);
+        else
+            sprintf(valor, "\"%i\": %i, ", (i + 1), historico_sensor3[i]);
         strcat(sensor3, valor);
     }
     strcat(msg, sensor1);
     strcat(msg, sensor2);
     strcat(msg, sensor3);
-    strcat(msg, "}");
+    char aux[15];
+    sprintf(aux, "}, \"tempo\": %i}", tempo);
+    strcat(msg, aux);
     printf("\n\n %s \n", msg);
     publish(client, SBC_ENVIAR_HISTORICO, msg);
 }
 
-
 /**
  * Reconecta-se ao broker MQTT (caso ainda não esteja conectado ou em caso de a conexão cair)
  * em caso de sucesso na conexão ou reconexão, o subscribe dos tópicos é refeito.
-*/
-void reconnectMQTT() {
+ */
+void reconnectMQTT()
+{
 
-    while(!MQTTClient_isConnected(client)) {
+    while (!MQTTClient_isConnected(client))
+    {
         printf("Tentando se conectar ao Broker MQTT:\n %s", ADDRESS);
         int returnCode;
         MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
         MQTTClient_create(&client, ADDRESS, CLIENTID,
-                        MQTTCLIENT_PERSISTENCE_NONE, NULL);
+                          MQTTCLIENT_PERSISTENCE_NONE, NULL);
         // Define as funções que devem ser chamadas na perca de conexão e no recebimento de mensagens.
-        MQTTClient_setCallbacks(client, NULL, reconnectMQTT, on_message, NULL);  
+        MQTTClient_setCallbacks(client, NULL, reconnectMQTT, on_message, NULL);
 
         // MQTT Connection parameters
         conn_opts.username = USERNAME;
@@ -299,7 +327,7 @@ void reconnectMQTT() {
             printf("Conectado com sucesso ao BROKER");
             MQTTClient_subscribe(client, NODE0_RESPOSTA, QOS);
             MQTTClient_subscribe(client, SENSORES, QOS);
-      //    MQTTClient_subscribe(client, APLICACAO_TEMPO_MEDICAO, 0);
+            //    MQTTClient_subscribe(client, APLICACAO_TEMPO_MEDICAO, 0);
         }
         else
         {
@@ -382,7 +410,7 @@ int main()
             *p_message++ = alterar_tempo;
             *p_message++ = tempo;
             enviar_valores_sensores_aplicacao();
-             break;
+            break;
         default:
             continue;
         }
