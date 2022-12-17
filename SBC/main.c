@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-// #include <wiringPi.h>
-// #include <lcd.h>
+#include <wiringPi.h>
+#include <lcd.h>
 #include <MQTTClient.h>
 #include <stdlib.h>
 #include <string.h>
