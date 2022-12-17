@@ -5,19 +5,21 @@
 #include <PubSubClient.h> // Importa a Biblioteca PubSubClient
 #include "Timer.h"
 #include <string.h> 
+#include <stdlib.h> 
 
 
 #ifndef STASSID
-#define STASSID "INTELBRAS" //"Cesar"
-#define STAPSK  "25588123" //"25588122"
 // #define STASSID "INTELBRAS" //"Cesar"
-// #define STAPSK  "Pbl-Sistemas-Digitais" //"25588122"
+// #define STAPSK  "25588123" //"25588122"
+#define STASSID "INTELBRAS" //"Cesar"
+#define STAPSK  "Pbl-Sistemas-Digitais" //"25588122"
 #endif
 
 // MQTT
 #define SUBSCRIBE_TOPIC_COMMAND "TP02G03/SBC/node0/comando"     //tópico MQTT de escuta dos comandos vindos da SBC.
+#define SUBSCRIBE_TOPIC_TIME    "TP02G03/SBC/node0/tempo"       //tópico para alteração de tempo.
 #define PUBLISH_TOPIC_RESPONSE  "TP02G03/SBC/node0/resposta"    //tópico MQTT de envio de códigos de resposta para o SBC.
-#define PUBLISH_TOPIC_SENSORES   "TP02G03/SBC/node0/sensores"     //tópico MQTT de envio dos dados dos sensores.
+#define PUBLISH_TOPIC_SENSORES   "TP02G03/SBC/node0/sensores"    //tópico MQTT de envio dos dados dos sensores.
 #define CLIENTID "TP02G03-ESP"
 #define USER "aluno"
 #define PASSWORD "@luno*123"
@@ -26,26 +28,16 @@
 
 
 //Mapeamento de pinos do NodeMCU
-#define pin16    16
-#define pin5      5
-#define pin4      4
-#define pin0      0
-#define pin2      2
-#define pin14    14
-#define pin12    12
-#define pin13    13
-#define pin15    15
-#define pin3      3
-#define pin1      1
+
 #define pinAnalog A0  // Entrada analógica.
  
 
 
 // FIXME: Retirar o comentário. 
 // Definições de rede
-// IPAddress local_IP(10, 0, 0, 109);
-// IPAddress gateway(10, 0, 0, 1);
-// IPAddress subnet(255, 255, 0, 0);
+IPAddress local_IP(10, 0, 0, 109);
+IPAddress gateway(10, 0, 0, 1);
+IPAddress subnet(255, 255, 0, 0);
 
 const char* host = "ESP-10.0.0.109";
 const char* ssid = STASSID;
@@ -53,8 +45,8 @@ const char* password = STAPSK;
 
 
 // Configuração MQTT
-const char* BROKER = "broker.emqx.io"; // FIXME: Trocar pelo broker do lab.
-// const char* BROKER = "10.0.0.101";
+// const char* BROKER = "broker.emqx.io"; // FIXME: Trocar pelo broker do lab.
+const char* BROKER = "10.0.0.101";
 const int BROKER_PORT = 1883;
 
 WiFiClient espClient; // Cria o objeto espClient
@@ -99,10 +91,11 @@ void reconnectMQTT()
         Serial.println(BROKER);
         // boolean connect (clientID, [username, password], [willTopic, willQoS, willRetain, willMessage], [cleanSession])
         // MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE)
-        if (MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE))
+        if (MQTT.connect(CLIENTID, USER, PASSWORD, PUBLISH_TOPIC_RESPONSE, QOS, false, WILL_MESSAGE))
         {
             Serial.println("Conectado com sucesso ao broker MQTT!");
             MQTT.subscribe(SUBSCRIBE_TOPIC_COMMAND, 1); 
+            MQTT.subscribe(SUBSCRIBE_TOPIC_TIME, 1); 
         } 
         else
         {
@@ -192,9 +185,41 @@ void onMessage(char* topic, byte* payload, unsigned int length)
               break;
             case 0x05: // Valor da entrada digital.
             {
-              int pino = payload[1];                          // Pino que o sensor está pinado.
+              int valor = payload[1];                          // Pino que o sensor está pinado.
+              int pino;
+              switch (pino)
+              {
+              case 0:
+                pino = D0;
+                Serial.println("Pino D0!");
+                break;
+              case 1:
+                pino = D1;
+                break;
+              case 2:
+                pino = D2;
+                break;
+              case 3:
+                pino = D3;
+                break;
+              case 4:
+                pino = D4;
+                break;
+              case 5:
+                pino = D5;
+                break;
+              case 6:
+                pino = D6;
+                break;
+              case 7:
+                pino = D7;
+                break;
+              default:
+                break;
+              }
               pinMode(pino, INPUT);                           // Define o pino como entrada.                     
               int value = digitalRead(pino);                // Ler o valor do sensor neste pino.
+              Serial.println(value);
               byte response[] = {0x02, value};
               publishData(PUBLISH_TOPIC_RESPONSE, response, sizeof(response));   
             }
@@ -214,10 +239,23 @@ void onMessage(char* topic, byte* payload, unsigned int length)
                 publishData(PUBLISH_TOPIC_RESPONSE, response, 1);  
                 break;
               }
-            case 0x09: // Altera o tempo de medições dos sensores.
-              {
+            default:
+                //Problema na requisicao ao NodeMCU.
+                byte response[1] = {0x1F};
+                publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
+                break;
+          }
+        }
+        else if(strcmp(topic, SUBSCRIBE_TOPIC_TIME) == 0){
+
                 Serial.println("Alteracao do tempo recebida.");
-                int newTime = payload[1];
+                String str = " ";
+                for (int i = 0; i< length; i++){
+                  char c = (char) payload[i];
+                  str+= c;
+                }
+
+                int newTime = str.toInt();
                 measurementTime = newTime;
                 Serial.print("Novo tempo: ");
                 Serial.println(measurementTime);
@@ -225,14 +263,6 @@ void onMessage(char* topic, byte* payload, unsigned int length)
                 publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
                 t.stop(0);
                 t.every(measurementTime * 1000, automaticMeasurements);
-              }
-              break;
-            default:
-                //Problema na requisicao ao NodeMCU.
-                byte response[1] = {0x1F};
-                publishData(PUBLISH_TOPIC_RESPONSE, response, 1);
-                break;
-          }
         }
     }
     else{
@@ -276,8 +306,8 @@ void publishString(char* topic, char* message)
 */
 void automaticMeasurements(void)
 {
-  byte sensor1 = {digitalRead(pin16)};
-  byte sensor2 = {digitalRead(pin5)};
+  byte sensor1 = {digitalRead(D0)};
+  byte sensor2 = {digitalRead(D1)};
   int analogValue= analogRead(pinAnalog);
   byte firstByteSensor3 = analogValue / 256; // Pega o primeiro byte do valor.
   byte secondByteSensor3 = analogValue % 256; // Pega o segundo byte do valor.
