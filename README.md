@@ -7,10 +7,9 @@ Este projeto tem por objetivo o aprimoramento do sistema descrito em [Problema #
 - [Instalação](#instalação)
 - [Introdução](#introdução)
 - [Objetivo](#objetivo)
-- [Metolodogia](#metodologia)
+- [Metodologia](#metodologia)
 - [Desenvolvimento](#desenvolvimento)
 - [Testes e resultados](#testes)
-- [Conclusão](#conclusão)
 - [Referências](#referências)
 
 ## Instalação
@@ -175,14 +174,6 @@ Publisher:
 
 Agora se tratando da comunicação entre a SBC e a interface remota, a SBC como centralizadora dos dados no sistema proposto envia o histórico das últimas 10 medições de cada sensor para a aplicação WEB por meio do tópico `/historico`. Além disso, caso o tempo de medições dos sensores seja alterado, como esse valor é exibido na interface WEB, para manter a sincronização e unidade dos dados, a SBC envia o novo valor do tempo de medição para a interface remova através do tópico `/tempo_remoto`, atualizando o valor exibido ao usuário. Do mesmo modo, caso o tempo de medições seja alterado na interface WEB, a aplicação envia pelo tópico `/tempo_local` o novo valor do tempo para a SBC e esta, por sua vez, envia para o NodeMCU o novo valor do tempo de medições.
 
-### Diagrama de Blocos
-
-FIXME: Colocar diagrama atual
-
-![Diagrama de Blocos](https://github.com/andersonlima7/serial-sensor/blob/main/diagrama_bloco.png?raw=true)
-
-<center>Figura 1. Diagrama de Blocos que representa a solução desenvolvida no problema.</center>
-
 ### Interface Local
 
 Após a implementação do protocolo, a interface de interação entre a SBC e o usuário foi construída. A interface baseia-se em utilizar uma espécie de máquina de estados para a exibição das opções de uso do sistema no display LCD. Os botões pinados na SBC foram usados para o usuário poder escolher as opções desejadas, basicamente o botão do pino 19 retrocede uma opção, o botão do pino 23 confirma a opção escolhida e o botão do pino 25 avança uma opção.
@@ -208,13 +199,15 @@ Durante o estado de menu, as opções que o usuário pode selecionar são exibid
 
 A cinco primeiras mandam mensagens para a SBC solicitando os comandos correspondentes, comando já detalhados na [tabela de comandos](#tabela). A opção **Digital** altera o estado da interface para o estado **ESCOLHER_SENSOR**, nesse estado uma lista de sensores são exibidas para o usuário poder escolher qual sensor quer saber a medição do valor digital. A opção **Tempo medicao** altera o estado para **ALTERAR_TEMPO**, nesse estado o usuário pode alterar o tempo de medição dos sensores utilizando os botões conectados na SBC, o botão do pino 19 é usado para diminuir o valor do tempo e do pino 25 é usado para aumentar o tempo. A opção **Historico** é única que não manda uma mensagem para o NodeMCU, pois corresponde a exibir o histórico de 10 medições dos sensores. Essa opção altera o estado da interface para **HISTORICO**, nesse estado o usuário pode escolher qual dos sensores ela quer visualizar o histórico. Após escolher o sensor que se quer ver o histórico, o estado altera-se para EXIBIR_HISTORICO, nesse estado, as linhas do histórico do sensor escolhido deveriam ser exibidas, porém por falta de tempo <span style="color:#DC143C">essa função não funcionou corretamente</span>, desse modo o histórico é exibido no terminal, sendo assim, esse estado se faz desnecessário nessa condição. Após selecionar cada uma das opções, para a exibição das respostas vindo da NodeMCU, a interface vai para o estado de espera, nesse estado a interface exibe os dados de resposta até que o usuário pressione o botão de avançar ou de retroceder, caso o usuário pressione o botão de confirmação uma nova requisição é feita para a NodeMCU. Por fim, foi incluída a opção **Sair** que finaliza corretamente a execução do programa.
 
-### Interface WEB
-
 ## Testes e resultados
 
-## Conclusão
+Alguns testes que foram feitos para verificar o funcionamento do sistema são descritos a seguir:
 
-Através desse projeto foi possível ter dimensão da importância das comunicações via Internet das Coisas, e a forma como esse é feito tanto a nível lógico baixo quanto em um nível de abstração maior, o que nos possibilitou também a compreensão da integração de códigos em Assembly (display LCD) e códigos em C (Comunicação UART). Este projeto também permite a compreensão do papel que os microcontroladores possuem na comunicação IoT, tanto a nível macro, quanto a nível específico e tecnicamente, dado que realizamos a configuração direta deste equipamento e o adaptamos ao problema apresentado. Por fim, percebeu-se também a forma como ocorre a comunicação Serial, através da configuração, tanto na SBC quanto na NodeMCU, do protocolo de comunicação assíncrono e serial UART. A solução aqui apresentada resolve o problema colocado, no entanto, é passível de diversas melhorias, a exemplo de um melhor controle das limitações de projeto e de eventuais tratamentos de erros que possam ocorrer por parte de usuário (ao selecionar pinos incorretos, por exemplo) ou não, pode-se ainda melhorar o tempo de realização da comunicação ao removermos alguns lapsos de tempo utilizados no projeto.
+- A comunicação entre SBC e NodeMCU via protocolo MQTT foi testada juntamente com os requisitos do [Problema #2 – Interfaces de Entrada e Sáida](https://github.com/andersonlima7/serial-sensor/). O funcionamento foi de 100%, nenhum entrave nessa questão, as duas entidades trocam mensagens entre si e cada um dos quesitos solicitados foram devidamente atendidos.
+
+- A interface local foi testada, foi verificado se as opções eram exibidas corretamente, na ordem correta e se as respostas das requisições eram apresentadas ao usuários de forma precisa. Nessa questão o problema pecou ao exibir o histórico do sensor escolhido para o usuário, como já foi dito anteriormente para cumprir esse requisito o histórico teve que ser exibido no terminal. Desse modo o funcionamento da interface local se dá em 90%.
+
+- A conexão com a interface remota foi igualmente testada juntamente com seu funcionamento. Infelizmente, alguns problemas foram notados nesse caso: A interface remota apresenta problemas de receber dados dos sensores e de enviar o novo tempo de medição que o usuário escolhe para a SBC. Como as vezes ela recebe os dados dos sensores e as vezes não, essa questão fica bem comprometida, porém, ao selecionar um novo tempo de medição na SBC, esse tempo é atualizado de forma correta na interface remota. Dessa forma, o funcionamento desse caso é de cerca de 50%, sendo o principal ponto de aprimoramento desse sistema.
 
 ## Referências
 
