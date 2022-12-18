@@ -37,7 +37,7 @@ Para executar o código do NodeMCU, utilize o Arduino IDE para fazer upload do c
 
 ### Interface WEB
 
-A interface WEB bem como suas instruções de uso pode ser acessada nesse [repositório](!https://github.com/antonyaraujo/sensor-iot-app).
+A interface WEB bem como suas instruções de uso pode ser acessada nesse [repositório](https://github.com/antonyaraujo/sensor-iot-app).
 
 ## Introdução
 
