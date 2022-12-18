@@ -61,7 +61,7 @@ WiFiClient espClient; // Cria o objeto espClient
 PubSubClient MQTT(espClient); // Instancia o Cliente MQTT passando o objeto espClient
 
 // Mensagem que é enviada caso o NodeMCU perca a conexão(0X1F = NodeMCU com problema).
-char WILL_MESSAGE[] = {0x1F};
+unsigned char WILL_MESSAGE[] = {0x1F};
 
 int ledPin = LED_BUILTIN;     // Pino do LED.
 
@@ -98,8 +98,8 @@ void reconnectMQTT()
         Serial.print("* Tentando se conectar ao Broker MQTT: ");
         Serial.println(BROKER);
         // boolean connect (clientID, [username, password], [willTopic, willQoS, willRetain, willMessage], [cleanSession])
-        // MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE)
-        if (MQTT.connect(CLIENTID, USER, PASSWORD, SUBSCRIBE_TOPIC_COMMAND, QOS, false, WILL_MESSAGE))
+        // MQTT.connect(CLIENTID, USER, PASSWORD, PUBLISH_TOPIC_RESPONSE, QOS, false, WILL_MESSAGE)
+        if (MQTT.connect(CLIENTID, USER, PASSWORD, PUBLISH_TOPIC_RESPONSE, QOS, false, WILL_MESSAGE))
         {
             Serial.println("Conectado com sucesso ao broker MQTT!");
             MQTT.subscribe(SUBSCRIBE_TOPIC_COMMAND, 1); 
