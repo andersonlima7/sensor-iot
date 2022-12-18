@@ -35,6 +35,10 @@ sudo ./main
 
 Para executar o código do NodeMCU, utilize o Arduino IDE para fazer upload do código [main](/NodeMCU/main/main.ino). Ao faze-lo, o código já será executado automaticamente.
 
+### Interface WEB
+
+A interface WEB bem como suas instruções de uso pode ser acessada nesse [repositório](!https://github.com/antonyaraujo/sensor-iot-app).
+
 ## Introdução
 
 O ramo da Internet das Coisas (IoT) está em constante expansão, cada vez mais diversos equipamentos e produtos do dia a dia estão sendo inseridos em um ambiente de rede, por essa razão faz-se necessário entender como os equipamentos utilizados para propiciar a comunicação são programados e como inseri-lós no ambiente em rede, considerando a necessidade de integração com sistemas de controle, que normalmente são gerenciados por entes centrais, como SBC (Single Board Computer).
